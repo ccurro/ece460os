@@ -39,7 +39,7 @@ int statPerms(struct stat fileStat)
 }
 
 
-int listdir(const char *path) {
+int listdir(const char *path, int uid) {
 	struct dirent *entry;
 	DIR *dp;
 	char actualpath [PATH_MAX+1];
@@ -58,7 +58,6 @@ int listdir(const char *path) {
 	struct group  * grpInfo;
 	struct tm * tmInfo;
 	char * tmStr;
-	// char * tmPtr = &tmStr[0];
 
 	while((entry = readdir(dp))) {
 		newpath[0] = '\0';
@@ -69,7 +68,7 @@ int listdir(const char *path) {
 
 		stat(newpath,&sb);
 
-		if (!(strcmp(name,"..") == 0) && !(strcmp(name,".") == 0)) {
+		if (!(strcmp(name,"..") == 0) && !(strcmp(name,".") == 0) && ((sb.st_uid == uid) || (uid == -1))) {
 			printf("%d/%d %d ",sb.st_dev,sb.st_ino,sb.st_nlink);
 			statPerms(sb);
 			printf(" ");
@@ -92,7 +91,7 @@ int listdir(const char *path) {
 
 		if (entry->d_type == DT_DIR && !(strcmp(name,"..") == 0) && !(strcmp(name,".") == 0) ) {
 
-			listdir(newpath); 
+			listdir(newpath,uid); 
 		}
 	}
 
@@ -103,23 +102,34 @@ int listdir(const char *path) {
 int main(int argc, char * argv[]) {
 
 	int mtm = 0;
+	int uid = -1;
+	char username[32];
+	int c;
 
 	while ( (c = getopt(argc, argv, "u:m:")) != -1) {
 		switch (c) {
 			case 'u':
-        		sscanf(optarg, "%u", &bufferSize);
+        		sscanf(optarg, "%d", &uid);
+				sscanf(optarg, "%s", &username);
         		break;
         	case 'm':
-        		sscanf(optarg, "%d", &bufferSize);
+        		sscanf(optarg, "%d", &mtm);
         		break;
         	case '?':
         		break;
         	default:
         		printf ("?? getopt returned character code 0%o ??\n", c);
         	}
+	}
 
-        	listdir("../..");
+	if (uid == -1) {
+		struct passwd * uidInfo; 
+		uidInfo = getpwnam(username);
+		uid = uidInfo->pw_uid;
+	}
 
-        	return 0;
-        }
+    listdir("../..", uid);
+
+    return 0;
+        
 }

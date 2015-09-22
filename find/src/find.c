@@ -40,7 +40,7 @@ int statPerms(struct stat fileStat)
 }
 
 
-int listdir(const char *path, int uid) {
+int listdir(const char *path, int uid, int mtm) {
 	struct dirent *entry;
 	DIR *dp;
 	char actualpath [PATH_MAX+1];
@@ -71,7 +71,14 @@ int listdir(const char *path, int uid) {
 
 		lstat(newpath,&sb);
 
-		if (!(strcmp(name,"..") == 0) && !(strcmp(name,".") == 0) && ((sb.st_uid == uid) || (uid == -1))) {
+		time_t now = time(0);
+
+		int A = (mtm == 0);
+		int B = (now - sb.st_mtime) > abs(mtm);
+		int C = (mtm > 0);
+		// Modify Time logic is A + !(B xor C)
+
+		if (!(strcmp(name,"..") == 0) && !(strcmp(name,".") == 0) && ((sb.st_uid == uid) || (uid == -1)) && (A || (B == C))) {
 			printf("%d/%d %d ",sb.st_dev,sb.st_ino,sb.st_nlink);
 			statPerms(sb);
 			printf(" ");
@@ -80,9 +87,9 @@ int listdir(const char *path, int uid) {
 			printf(" ");
 			grpInfo = getgrgid(sb.st_gid);
 			printf(grpInfo->gr_name);
-			printf(" ");
-			printf("%d",sb.st_size);
-			printf(" ");
+			// printf(" ");
+			printf(" %d ",sb.st_size);
+			// printf(" ");
 			tmInfo = localtime(&sb.st_mtime);
 			tmStr = asctime(tmInfo);
 			tmStr[24] = 0;
@@ -102,7 +109,7 @@ int listdir(const char *path, int uid) {
 
 		if (entry->d_type == DT_DIR && !(strcmp(name,"..") == 0) && !(strcmp(name,".") == 0) ) {
 
-			listdir(newpath,uid); 
+			listdir(newpath,uid,mtm); 
 		}
 	}
 
@@ -139,7 +146,7 @@ int main(int argc, char * argv[]) {
 		uid = uidInfo->pw_uid;
 	}
 
-    listdir("../..", uid);
+    listdir("../..", uid,mtm);
 
     return 0;
         

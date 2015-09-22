@@ -23,24 +23,22 @@ int pathCombine(const char * dir, const char * base, char * path) {
 int statPerms(struct stat fileStat)
 {
 
-    printf( (S_ISDIR(fileStat.st_mode)) ? "d" : "-");
-    printf( (fileStat.st_mode & S_IRUSR) ? "r" : "-");
-    printf( (fileStat.st_mode & S_IWUSR) ? "w" : "-");
-    printf( (fileStat.st_mode & S_IXUSR) ? "x" : "-");
-    printf( (fileStat.st_mode & S_IRGRP) ? "r" : "-");
-    printf( (fileStat.st_mode & S_IWGRP) ? "w" : "-");
-    printf( (fileStat.st_mode & S_IXGRP) ? "x" : "-");
-    printf( (fileStat.st_mode & S_IROTH) ? "r" : "-");
-    printf( (fileStat.st_mode & S_IWOTH) ? "w" : "-");
-    printf( (fileStat.st_mode & S_IXOTH) ? "x" : "-");
+	printf( (S_ISDIR(fileStat.st_mode)) ? "d" : "-");
+	printf( (fileStat.st_mode & S_IRUSR) ? "r" : "-");
+	printf( (fileStat.st_mode & S_IWUSR) ? "w" : "-");
+	printf( (fileStat.st_mode & S_IXUSR) ? "x" : "-");
+	printf( (fileStat.st_mode & S_IRGRP) ? "r" : "-");
+	printf( (fileStat.st_mode & S_IWGRP) ? "w" : "-");
+	printf( (fileStat.st_mode & S_IXGRP) ? "x" : "-");
+	printf( (fileStat.st_mode & S_IROTH) ? "r" : "-");
+	printf( (fileStat.st_mode & S_IWOTH) ? "w" : "-");
+	printf( (fileStat.st_mode & S_IXOTH) ? "x" : "-");
 
-    // printf("The file %s a symbolic link\n", (S_ISLNK(fileStat.st_mode)) ? "is" : "is not");
-
-    return 0;
+	return 0;
 }
 
 
-int listdir(const char *path, int uid, int mtm) {
+int listdir(const char *path, int uid, int mtm, int count) {
 	struct dirent *entry;
 	DIR *dp;
 	char actualpath [PATH_MAX+1];
@@ -87,9 +85,11 @@ int listdir(const char *path, int uid, int mtm) {
 			printf(" ");
 			grpInfo = getgrgid(sb.st_gid);
 			printf(grpInfo->gr_name);
-			// printf(" ");
-			printf(" %d ",sb.st_size);
-			// printf(" ");
+			if ((sb.st_mode & S_IFBLK) || (sb.st_mode & S_IFCHR)) {
+				printf(" BLK/CHR "); // print raw device number
+			} else {
+				printf(" %d ",sb.st_size);
+			}
 			tmInfo = localtime(&sb.st_mtime);
 			tmStr = asctime(tmInfo);
 			tmStr[24] = 0;
@@ -108,8 +108,12 @@ int listdir(const char *path, int uid, int mtm) {
 		}
 
 		if (entry->d_type == DT_DIR && !(strcmp(name,"..") == 0) && !(strcmp(name,".") == 0) ) {
-
-			listdir(newpath,uid,mtm); 
+			count++;
+			if (count == 1024) {
+				printf("Maximum depth reached");
+				return -1;
+			}
+			listdir(newpath,uid,mtm,count); 
 		}
 	}
 
@@ -123,31 +127,38 @@ int main(int argc, char * argv[]) {
 	int uid = -1;
 	char username[32];
 	int c;
+	int count = 0;
+	int userFilter = 0;
 
 	while ( (c = getopt(argc, argv, "u:m:")) != -1) {
 		switch (c) {
 			case 'u':
-        		sscanf(optarg, "%d", &uid);
+				sscanf(optarg, "%d", &uid);
 				sscanf(optarg, "%s", &username);
-        		break;
-        	case 'm':
-        		sscanf(optarg, "%d", &mtm);
-        		break;
-        	case '?':
-        		break;
-        	default:
-        		printf ("?? getopt returned character code 0%o ??\n", c);
-        	}
+				userFilter = 1;
+				break;
+			case 'm':
+				sscanf(optarg, "%d", &mtm);
+				break;
+			case '?':
+				break;
+				default:
+			printf ("?? getopt returned character code 0%o ??\n", c);
+		}
 	}
 
-	if (uid == -1) {
+	char searchpath[PATH_MAX+1];
+
+	sscanf(argv[optind],"%s",searchpath);
+
+	if ((uid == -1) && (userFilter ==1 )) {
 		struct passwd * uidInfo; 
 		uidInfo = getpwnam(username);
 		uid = uidInfo->pw_uid;
 	}
 
-    listdir("../..", uid,mtm);
+	listdir(searchpath, uid,mtm,count); 
 
-    return 0;
-        
+	return 0;
+
 }

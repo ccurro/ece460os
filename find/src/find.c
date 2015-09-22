@@ -10,6 +10,7 @@
 #include <pwd.h>
 #include <grp.h>
 #include <time.h>
+#include <limits.h>
 
 int pathCombine(const char * dir, const char * base, char * path) {
 	strcat(path, dir);
@@ -52,7 +53,8 @@ int listdir(const char *path, int uid) {
 		return -1;
 	}
 
-	char newpath [PATH_MAX+1] ;
+	char newpath [PATH_MAX+1];
+	char linkres [PATH_MAX+1];
 	struct stat sb; 
 	struct passwd * userInfo;
 	struct group  * grpInfo;
@@ -61,12 +63,13 @@ int listdir(const char *path, int uid) {
 
 	while((entry = readdir(dp))) {
 		newpath[0] = '\0';
+		linkres[0] ='\0';
 
 		char * name = entry->d_name;
 
 		pathCombine(actualpath,name,newpath);
 
-		stat(newpath,&sb);
+		lstat(newpath,&sb);
 
 		if (!(strcmp(name,"..") == 0) && !(strcmp(name,".") == 0) && ((sb.st_uid == uid) || (uid == -1))) {
 			printf("%d/%d %d ",sb.st_dev,sb.st_ino,sb.st_nlink);
@@ -86,6 +89,14 @@ int listdir(const char *path, int uid) {
 			printf(tmStr);
 			printf(" ");
 			printf(newpath);
+			if (S_ISLNK(sb.st_mode))
+			{
+				printf(" -> ");
+				readlink(newpath,linkres,PATH_MAX+1);
+				char * respath = realpath(linkres,NULL);
+				printf(respath);
+			}
+
 			printf("\n");
 		}
 

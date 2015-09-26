@@ -12,6 +12,37 @@
 #include <time.h>
 #include <limits.h>
 
+int inode_list[1024]; 
+char dir_list[1024][PATH_MAX];
+int inode_list_count = 0;
+// only count inodes of dirs and can only open 1024 dirs
+// (list for loop detection)
+
+int elof(int val, int *arr, int size){
+    int i;
+    for (i=0; i < size; i++) {
+        if (arr[i] == val)
+            return 1;
+    }
+    return 0;
+}
+
+int inodeConflict(ino_t inode, const char *path, int * inode_list, int count) {
+	if (count == 0) {
+		inode_list[count] = inode;
+		strcpy(dir_list[count],path);
+		return 0;
+	} else {
+		if (elof(inode, inode_list, count) == 1) {
+			return 1;
+		} else {
+			inode_list[count] = inode;
+			strcpy(dir_list[count],path);
+			return 0;
+		}
+	}
+}
+
 int pathCombine(const char * dir, const char * base, char * path) {
 	strcat(path, dir);
 	strcat(path, "/");
@@ -38,7 +69,7 @@ int statPerms(struct stat fileStat)
 }
 
 
-int listdir(const char *path, int uid, int mtm, int count) {
+int listdir(const char *path, int uid, int mtm, int vol, int count) {
 	struct dirent *entry;
 	DIR *dp;
 	char actualpath [PATH_MAX+1];
@@ -47,7 +78,7 @@ int listdir(const char *path, int uid, int mtm, int count) {
 
 	dp = opendir(actualpath);
 	if (dp == NULL) {
-		perror("opendir");
+		// perror("opendir");
 		return -1;
 	}
 
@@ -77,19 +108,25 @@ int listdir(const char *path, int uid, int mtm, int count) {
 		// Modify Time logic is A + !(B xor C)
 
 		if (!(strcmp(name,"..") == 0) && !(strcmp(name,".") == 0) && ((sb.st_uid == uid) || (uid == -1)) && (A || (B == C))) {
-			printf("%d/%d %d ",sb.st_dev,sb.st_ino,sb.st_nlink);
+			printf("%lld/%lld %d ",sb.st_dev,sb.st_ino,sb.st_nlink);
 			statPerms(sb);
 			printf(" ");
 			userInfo = getpwuid(sb.st_uid);
-			printf(userInfo->pw_name);
-			printf(" ");
+			if (userInfo) {
+				printf(userInfo->pw_name);
+				printf(" ");
+			} else {
+				printf("%d ",sb.st_uid);
+			}
 			grpInfo = getgrgid(sb.st_gid);
 			printf(grpInfo->gr_name);
+
 			if ((sb.st_mode & S_IFBLK) || (sb.st_mode & S_IFCHR)) {
 				printf(" BLK/CHR "); // print raw device number
 			} else {
 				printf(" %d ",sb.st_size);
 			}
+
 			tmInfo = localtime(&sb.st_mtime);
 			tmStr = asctime(tmInfo);
 			tmStr[24] = 0;
@@ -113,7 +150,22 @@ int listdir(const char *path, int uid, int mtm, int count) {
 				printf("Maximum depth reached");
 				return -1;
 			}
-			listdir(newpath,uid,mtm,count); 
+
+			if ((inodeConflict(sb.st_ino, newpath, inode_list, inode_list_count) == 0) && ((vol == 0) || (vol == sb.st_dev))) {
+				listdir(newpath,uid,mtm,vol,count); 
+				inode_list_count++;
+			} else if (vol != sb.st_dev) {
+				printf("Not crossing mount point at");
+				printf(actualpath);
+				printf("\n");
+			}
+			else {
+				printf("Hit conflict: ");
+				printf(newpath);
+				printf(", ");
+				printf(dir_list[inode_list_count-1]);
+				printf("\n");
+			}
 		}
 	}
 
@@ -129,6 +181,8 @@ int main(int argc, char * argv[]) {
 	int c;
 	int count = 0;
 	int userFilter = 0;
+	int sameVol = 0;
+	int vol = 0;
 
 	while ( (c = getopt(argc, argv, "u:m:")) != -1) {
 		switch (c) {
@@ -139,6 +193,9 @@ int main(int argc, char * argv[]) {
 				break;
 			case 'm':
 				sscanf(optarg, "%d", &mtm);
+				break;
+			case 'x':
+				sameVol = 1;
 				break;
 			case '?':
 				break;
@@ -151,13 +208,21 @@ int main(int argc, char * argv[]) {
 
 	sscanf(argv[optind],"%s",searchpath);
 
+	if (sameVol == 1) {
+		struct stat sp;
+		// DIR * pd = opendir(realpath(searchpath,NULL));
+		// struct dirent * entry = readdir(pd);
+		lstat(realpath(searchpath,NULL),&sp);
+		vol = sp.st_dev;
+	}
+
 	if ((uid == -1) && (userFilter ==1 )) {
 		struct passwd * uidInfo; 
 		uidInfo = getpwnam(username);
 		uid = uidInfo->pw_uid;
 	}
 
-	listdir(searchpath, uid,mtm,count); 
+	listdir(searchpath,uid,mtm,vol,count); 
 
 	return 0;
 

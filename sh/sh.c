@@ -1,64 +1,127 @@
+#define _GNU_SOURCE 
 #include <stdio.h>
 #include <errno.h>
 #include <string.h>
 #include <stdlib.h>
 #include <sys/types.h>
 #include <limits.h>
+#include <unistd.h>
+#include <wait.h>
+#include <fcntl.h>
+#include <sys/types.h>
+#include <sys/stat.h>
 
-// Parse string of form :
-// command {arg {arg ...} } {redirect {redirect ...}}
-int spaceParse(char parsed [][MAX_CANON], char cmdln[MAX_CANON]) {
-	// cmdln is a string of the maxium length number of
-	// bytes in a terminal canonical input line.
+int main (int argc, char * argv[]) {
 
-	//parsed in a 2d buffer, one row for each space deliminted item
+	char scriptName[MAX_CANON] = {""};
+	char * line[MAX_CANON];
+	size_t len = 0;
 
-	int wrd = 0; // wrd of cmd string
-	char spc[1];
-	strcpy(spc," ");
+	if (argc > 2) {
+		printf("Two many input arguments\n");
+		return -1;
+	}
 
-	for (int i = 0; (cmdln[i] != '\0'); ++i) {
-		char c[2];
-		c[0] = cmdln[i];
+	strcat(scriptName,argv[1]); // load shell script.
 
-		if (c[0] == spc[0]) {
-			wrd++;
+	FILE * script = fopen(scriptName, "r");
+
+	char * wrds[MAX_CANON];
+	char * token;
+
+	while (getline(line, &len, script) != -1) {
+
+		char * ln = strtok(*line,"\n"); // remove trailing newline.
+		int i = 0;
+		int cmt = 0;
+		int Nstderr = 0;
+		int Nstdin  = 0;
+		int Nstdout = 0;
+		int rStdin  = 0;
+		int rStdout = 0;
+		int rStderr = 0;
+
+		token = strtok(ln, " ");
+
+		while( token != NULL ) {
+			if (token[0] == '#') {
+				cmt = 1;
+				break; // handle comment lines
+			}
+			if (strcmp(token,"<") == 0) {
+				token = strtok(NULL, " ");
+				rStdin = open(token,O_RDONLY);
+				Nstdin++;
+			} else if (strcmp(token,">") == 0) {
+				token = strtok(NULL, " ");
+				rStdout = open(token,O_WRONLY | O_CREAT, S_IRUSR | S_IWUSR);
+				Nstdout++;
+			} else if (strcmp(token,">>") == 0) {
+				token = strtok(NULL, " ");
+				rStdout = open(token,O_APPEND | O CREAT | O WRONLY, S_IRUSR | S_IWUSR);
+				Nstdout++;
+			} else if (strcmp(token,"2>") == 0) {
+				token = strtok(NULL, " ");
+				rStderr = open(token,O_WRONLY | O_CREAT, S_IRUSR | S_IWUSR);
+				Nstderr++;
+			} else if (strcmp(token,"2>>") == 0) {
+				token = strtok(NULL, " ");
+				rStderr = open(token,O_APPEND | O CREAT | O WRONLY, S_IRUSR | S_IWUSR);
+				Nstderr++;
+			}
+			else {	
+				wrds[i] = strdup(token);
+				i++;
+			}
+			token = strtok(NULL, " ");
+		}
+
+		if ((Nstdout < 2) && (Nstderr < 2) && (Nstdin < 2) != 1) {
+			printf("Too many redirects on a given file descriptor\n");
+			return -1;
+		}
+
+		if (cmt)
+			continue;
+
+		char * cmd = wrds[0];
+		char * sargv[i+1];
+
+		sargv[0] = cmd;
+		sargv[i+1] = NULL;
+
+		for (int j = 1; j < i; j++)
+			sargv[j] = wrds[j];
+
+		pid_t c_pid;
+
+		c_pid = fork(); //duplicate                                                                                                                                                
+
+		if( c_pid == 0 ){
+			if (rStdin)
+				dup2(rStdin,STDIN_FILENO);
+
+			if (rStdout) 
+				dup2(rStdout,STDOUT_FILENO);
+
+			if (rStderr) 
+				dup2(rStderr,STDERR_FILENO);
+
+			fcloseall(); // give clean file descriptor env.
+			execvp(cmd,sargv);
+		} else if (c_pid > 0){
+			int stat_val = 0;
+
+			wait(&stat_val);
+
+			while (WIFEXITED(stat_val) == 0) {
+				wait(&stat_val);
+			}
 		} else {
-			strcat(parsed[wrd],c);
+			perror("fork failed");
+			_exit(2); //exit failure, hard 
 		}
 	}
 
 	return 0;
-}
-
-int redirectParse(char parsed[][MAX_CANON], char cmdln[MAX_CANON]) {
-	char spcPrsd[1024][MAX_CANON] = {""};
-	spaceParse(spcPrsd, cmdln);
-
-	int nCmd = 0;
-
-	for (int i = 0; (spcPrsd[i][0] != '\0'); ++i) {
-		if (strcmp(spcPrsd[i], ">")) {
-			strcpy(parsed[nCmd],spcPrsd[i]);
-			++nCmd;
-		} else {
-			strcat(parsed[nCmd],spcPrsd[i]);
-		}
-	}
-
-}
-
-int main () {
-	char cmdln[MAX_CANON]; 
-	char prs[1024][MAX_CANON];
-
-	strcpy(cmdln, "quick brown fox > test");
-
-	// spaceParse(prs, cmdln);
-	redirectParse(prs,cmdln);
-
-	for (int i = 0; (prs[i][0] != '\0'); ++i) {
-		printf("%s\n", prs[i]);
-	}
-
 }

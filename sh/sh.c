@@ -10,7 +10,9 @@
 #include <fcntl.h>
 #include <sys/types.h>
 #include <sys/stat.h>
-
+#include <sys/time.h>
+#include <sys/resource.h>
+ 
 int main (int argc, char * argv[]) {
 
 	char scriptName[MAX_CANON] = {""};
@@ -34,12 +36,8 @@ int main (int argc, char * argv[]) {
 		char * ln = strtok(*line,"\n"); // remove trailing newline.
 		int i = 0;
 		int cmt = 0;
-		int Nstderr = 0;
-		int Nstdin  = 0;
-		int Nstdout = 0;
-		int rStdin  = 0;
-		int rStdout = 0;
-		int rStderr = 0;
+		int Nstderr = 0, Nstdin  = 0, Nstdout = 0;
+		int rStdin  = 0, rStdout = 0, rStderr = 0;
 
 		token = strtok(ln, " ");
 
@@ -58,7 +56,7 @@ int main (int argc, char * argv[]) {
 				Nstdout++;
 			} else if (strcmp(token,">>") == 0) {
 				token = strtok(NULL, " ");
-				rStdout = open(token,O_APPEND | O CREAT | O WRONLY, S_IRUSR | S_IWUSR);
+				rStdout = open(token,O_APPEND | O_CREAT | O_WRONLY, S_IRUSR | S_IWUSR);
 				Nstdout++;
 			} else if (strcmp(token,"2>") == 0) {
 				token = strtok(NULL, " ");
@@ -66,7 +64,7 @@ int main (int argc, char * argv[]) {
 				Nstderr++;
 			} else if (strcmp(token,"2>>") == 0) {
 				token = strtok(NULL, " ");
-				rStderr = open(token,O_APPEND | O CREAT | O WRONLY, S_IRUSR | S_IWUSR);
+				rStderr = open(token,O_APPEND | O_CREAT | O_WRONLY, S_IRUSR | S_IWUSR);
 				Nstderr++;
 			}
 			else {	
@@ -95,7 +93,7 @@ int main (int argc, char * argv[]) {
 
 		pid_t c_pid;
 
-		c_pid = fork(); //duplicate                                                                                                                                                
+		c_pid = fork();
 
 		if( c_pid == 0 ){
 			if (rStdin)
@@ -112,14 +110,14 @@ int main (int argc, char * argv[]) {
 		} else if (c_pid > 0){
 			int stat_val = 0;
 
-			wait(&stat_val);
+			struct rusage cusage;
+			wait3(&stat_val, 0, &cusage);
+			printf("sys:  %ld.%06ld\n", (long int)(cusage.ru_stime.tv_sec), (long int)(cusage.ru_stime.tv_usec));
+			printf("user: %ld.%06ld\n", (long int)(cusage.ru_utime.tv_sec), (long int)(cusage.ru_utime.tv_usec));
 
-			while (WIFEXITED(stat_val) == 0) {
-				wait(&stat_val);
-			}
 		} else {
 			perror("fork failed");
-			_exit(2); //exit failure, hard 
+			_exit(2);
 		}
 	}
 

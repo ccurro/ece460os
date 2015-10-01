@@ -18,15 +18,18 @@ int main (int argc, char * argv[]) {
 	char scriptName[MAX_CANON] = {""};
 	char * line[MAX_CANON];
 	size_t len = 0;
+	FILE * script;
 
 	if (argc > 2) {
 		printf("Two many input arguments\n");
 		return -1;
+	} else if (argc == 2) {
+		strcat(scriptName,argv[1]); // load shell script.
+		script = fopen(scriptName, "r");
+	} else {
+		script = fdopen(STDIN_FILENO,"r");
+		printf("$ ");
 	}
-
-	strcat(scriptName,argv[1]); // load shell script.
-
-	FILE * script = fopen(scriptName, "r");
 
 	char * wrds[MAX_CANON];
 	char * token;
@@ -119,6 +122,8 @@ int main (int argc, char * argv[]) {
 			perror("fork failed");
 			_exit(2);
 		}
+		if (argc == 1)
+			printf("\n$ ");
 	}
 
 	return 0;

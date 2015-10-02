@@ -12,9 +12,21 @@
 #include <sys/stat.h>
 #include <sys/time.h>
 #include <sys/resource.h>
- 
+
+void mydup(int fd1, int fd2) {
+	if (fd1) {
+		if (dup2(fd1,fd2) < 0) {
+			char str[20];
+			sprintf(str, "Error on redirect of file desc %d", fd2);
+			perror(str);
+		    exit(EXIT_FAILURE);
+		}
+	}
+}
+
 int main (int argc, char * argv[]) {
 
+	int returnval = 0;
 	char scriptName[MAX_CANON] = {""};
 	char * line[MAX_CANON];
 	size_t len = 0;
@@ -55,7 +67,7 @@ int main (int argc, char * argv[]) {
 				Nstdin++;
 			} else if (strcmp(token,">") == 0) {
 				token = strtok(NULL, " ");
-				rStdout = open(token,O_WRONLY | O_CREAT, S_IRUSR | S_IWUSR);
+				rStdout = open(token,O_WRONLY | O_CREAT | O_TRUNC, S_IRUSR | S_IWUSR);
 				Nstdout++;
 			} else if (strcmp(token,">>") == 0) {
 				token = strtok(NULL, " ");
@@ -63,7 +75,7 @@ int main (int argc, char * argv[]) {
 				Nstdout++;
 			} else if (strcmp(token,"2>") == 0) {
 				token = strtok(NULL, " ");
-				rStderr = open(token,O_WRONLY | O_CREAT, S_IRUSR | S_IWUSR);
+				rStderr = open(token,O_WRONLY | O_CREAT | O_TRUNC, S_IRUSR | S_IWUSR);
 				Nstderr++;
 			} else if (strcmp(token,"2>>") == 0) {
 				token = strtok(NULL, " ");
@@ -77,7 +89,8 @@ int main (int argc, char * argv[]) {
 			token = strtok(NULL, " ");
 		}
 
-		if ((Nstdout < 2) && (Nstderr < 2) && (Nstdin < 2) != 1) {
+		if (!
+			((Nstdout < 2) && (Nstderr < 2) && (Nstdin < 2))) {
 			printf("Too many redirects on a given file descriptor\n");
 			return -1;
 		}
@@ -99,14 +112,9 @@ int main (int argc, char * argv[]) {
 		c_pid = fork();
 
 		if( c_pid == 0 ){
-			if (rStdin)
-				dup2(rStdin,STDIN_FILENO);
-
-			if (rStdout) 
-				dup2(rStdout,STDOUT_FILENO);
-
-			if (rStderr) 
-				dup2(rStderr,STDERR_FILENO);
+			mydup(rStdin,STDIN_FILENO);
+			mydup(rStdout,STDOUT_FILENO);
+			mydup(rStderr,STDERR_FILENO);
 
 			fcloseall(); // give clean file descriptor env.
 			execvp(cmd,sargv);
@@ -117,6 +125,9 @@ int main (int argc, char * argv[]) {
 			wait3(&stat_val, 0, &cusage);
 			printf("sys:  %ld.%06ld\n", (long int)(cusage.ru_stime.tv_sec), (long int)(cusage.ru_stime.tv_usec));
 			printf("user: %ld.%06ld\n", (long int)(cusage.ru_utime.tv_sec), (long int)(cusage.ru_utime.tv_usec));
+			printf("Exit Status: %d\n\n", WEXITSTATUS(stat_val));
+
+			returnval += stat_val;	
 
 		} else {
 			perror("fork failed");
@@ -126,5 +137,5 @@ int main (int argc, char * argv[]) {
 			printf("\n$ ");
 	}
 
-	return 0;
+	return returnval;
 }

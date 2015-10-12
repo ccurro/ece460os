@@ -54,26 +54,22 @@ int main(int argc, char * argv[]) {
         totalFiles++;
 
         more_pid = fork();
+        errReport(more_pid,"Failed to open more: ");
 
         if (more_pid == 0) {
             errReport(dup2(more_pipe[0],STDIN_FILENO),"Error on dup2, ");
             execvp("more",NULL);
             fprintf(stderr, "Failed to open more: %s\n", strerror(errno));
             exit(EXIT_FAILURE);
-        } else if (more_pid == -1) {
-            fprintf(stderr, "Failed to open more: %s\n", strerror(errno));
-            exit(EXIT_FAILURE);
         }
 
         grep_pid = fork();
+        errReport(grep_pid,"Failed to open grep: ");
 
         if (grep_pid == 0) {
             errReport(dup2(grep_pipe[0],STDIN_FILENO),"Error on dup2, ");
             errReport(dup2(more_pipe[1],STDOUT_FILENO),"Error on dup2, ");;
             execlp("grep","grep",argv[1], (char *) NULL);
-            fprintf(stderr, "Failed to open grep: %s\n", strerror(errno));
-            exit(EXIT_FAILURE);
-        } else if (grep_pid == -1) {
             fprintf(stderr, "Failed to open grep: %s\n", strerror(errno));
             exit(EXIT_FAILURE);
         }

@@ -38,7 +38,7 @@ int main(int argc, char * argv[]) {
     condChk(signal(SIGINT, byteReport) == SIG_ERR, "An error occured while setting a signal handler");
     condChk(argc < 3, "Too few input arguments.\n ex: castrato pattern infile1 [...infile2...]\n");
 
-	uint bufferSize = 1024;
+    uint bufferSize = 1024;
 
     for (int findex = 2; findex < argc; findex++) {
 
@@ -78,15 +78,15 @@ int main(int argc, char * argv[]) {
             exit(EXIT_FAILURE);
         }
 
-    	int nBytesRead = 1;
+        int nBytesRead = 1;
         unsigned char buffer[bufferSize];
 
-    	while (nBytesRead != 0) {
-    		nBytesRead = read(fd,buffer,bufferSize);
+        while (nBytesRead != 0) {
+            nBytesRead = read(fd,buffer,bufferSize);
             errReport(nBytesRead,argv[findex]);
             errReport(write(grep_pipe[1], buffer, nBytesRead),"Error on output");
             totalBytes = totalBytes + nBytesRead;
-    	}
+        }
 
         errReport(close(fd),"Error on close of input: ");
 

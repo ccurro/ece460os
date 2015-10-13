@@ -14,6 +14,7 @@ int totalFiles = 0;
 
 void byteReport(int signo) {
     fprintf(stderr,"%s, Bytes read: %d, Files read: %d \n", strsignal(signo), totalBytes, totalFiles);
+    exit(EXIT_FAILURE);
 }
 
 void condChk(int condition, char * str) {
@@ -57,21 +58,17 @@ int main(int argc, char * argv[]) {
         errReport(more_pid,"Failed to open more: ");
 
         if (more_pid == 0) {
-            errReport(dup2(more_pipe[0],STDIN_FILENO),"Error on dup2, ");
-            execvp("more",NULL);
-            fprintf(stderr, "Failed to open more: %s\n", strerror(errno));
-            exit(EXIT_FAILURE);
+            errReport(dup2(more_pipe[0],STDIN_FILENO),"Error on dup2 of more_piep to stdin, ");
+            errReport(execvp("more",NULL),"Failed to open more: ");
         }
 
         grep_pid = fork();
         errReport(grep_pid,"Failed to open grep: ");
 
         if (grep_pid == 0) {
-            errReport(dup2(grep_pipe[0],STDIN_FILENO),"Error on dup2, ");
-            errReport(dup2(more_pipe[1],STDOUT_FILENO),"Error on dup2, ");;
-            execlp("grep","grep",argv[1], (char *) NULL);
-            fprintf(stderr, "Failed to open grep: %s\n", strerror(errno));
-            exit(EXIT_FAILURE);
+            errReport(dup2(grep_pipe[0],STDIN_FILENO),"Error on dup2 of grep_pipe to stdin, ");
+            errReport(dup2(more_pipe[1],STDOUT_FILENO),"Error on dup2 of more_pipe to stdout, ");;
+            errReport(execlp("grep","grep",argv[1], (char *) NULL),"Failed to open grep: ");
         }
 
         int nBytesRead = 1;
@@ -80,7 +77,7 @@ int main(int argc, char * argv[]) {
         while (nBytesRead != 0) {
             nBytesRead = read(fd,buffer,bufferSize);
             errReport(nBytesRead,argv[findex]);
-            errReport(write(grep_pipe[1], buffer, nBytesRead),"Error on output");
+            errReport(write(grep_pipe[1], buffer, nBytesRead),"Error on writing to grep pipe: ");
             totalBytes = totalBytes + nBytesRead;
         }
 

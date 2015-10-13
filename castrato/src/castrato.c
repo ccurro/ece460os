@@ -58,7 +58,7 @@ int main(int argc, char * argv[]) {
         errReport(more_pid,"Failed to open more: ");
 
         if (more_pid == 0) {
-            errReport(dup2(more_pipe[0],STDIN_FILENO),"Error on dup2 of more_piep to stdin, ");
+            errReport(dup2(more_pipe[0],STDIN_FILENO),"Error on dup2 of more_piep to stdin: ");
             errReport(execvp("more",NULL),"Failed to open more: ");
         }
 

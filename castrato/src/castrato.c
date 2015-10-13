@@ -26,13 +26,13 @@ void condChk(int condition, char * str) {
 
 void errReport(int returnVal, char * errStr) {
     char str[1024];
-    sprintf(str, "%s, %s ", errStr,strerror(errno));
+    sprintf(str, "%s%s ", errStr,strerror(errno));
     condChk(returnVal == -1, str);
 }
 
 void cpipe( int p[2]) {
     for (int i = 0; i < 2; i++)
-        errReport(close(p[i]),"Error on pipe close, ");
+        errReport(close(p[i]),"Error on pipe close: ");
 }
 
 int main(int argc, char * argv[]) {
@@ -47,8 +47,8 @@ int main(int argc, char * argv[]) {
         pid_t more_pid, grep_pid;
 
         // options set so I don't have to close pipes manually in children
-        errReport(pipe2(more_pipe,O_CLOEXEC), "Error on pipe open, ");
-        errReport(pipe2(grep_pipe,O_CLOEXEC), "Error on pipe open, ");
+        errReport(pipe2(more_pipe,O_CLOEXEC), "Error on pipe open: ");
+        errReport(pipe2(grep_pipe,O_CLOEXEC), "Error on pipe open: ");
 
         int fd = open(argv[findex], O_RDONLY); 
         errReport(fd, argv[findex]);
@@ -66,8 +66,8 @@ int main(int argc, char * argv[]) {
         errReport(grep_pid,"Failed to open grep: ");
 
         if (grep_pid == 0) {
-            errReport(dup2(grep_pipe[0],STDIN_FILENO),"Error on dup2 of grep_pipe to stdin, ");
-            errReport(dup2(more_pipe[1],STDOUT_FILENO),"Error on dup2 of more_pipe to stdout, ");;
+            errReport(dup2(grep_pipe[0],STDIN_FILENO),"Error on dup2 of grep_pipe to stdin: ");
+            errReport(dup2(more_pipe[1],STDOUT_FILENO),"Error on dup2 of more_pipe to stdout: ");;
             errReport(execlp("grep","grep",argv[1], (char *) NULL),"Failed to open grep: ");
         }
 

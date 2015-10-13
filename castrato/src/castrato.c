@@ -24,7 +24,7 @@ void condChk(int condition, char * str) {
     }
 }
 
-int errReport(int returnVal, char * errStr) {
+void errReport(int returnVal, char * errStr) {
     char str[1024];
     sprintf(str, "%s, %s ", errStr,strerror(errno));
     condChk(returnVal == -1, str);

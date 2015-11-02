@@ -19,6 +19,8 @@ int main() {
 		map[i] = writeStr[i];
 	}
 
+	errReport(munmap(map,(size_t) fileSize),"Failed to unmap map: ");
+
 	char buff[buffSize];
 
 	errReport(read(fd, buff, buffSize),"Failed to read from test file: ");

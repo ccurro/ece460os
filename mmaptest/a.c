@@ -20,5 +20,7 @@ int main() {
 	
 	map[0] = 1; // will SIGSEGV here
 
+	errReport(munmap(map,(size_t) fileSize),"Failed to unmap map: ");
+
 	errReport(close(fd), "Failed to close file: ");
 }

@@ -8,10 +8,12 @@ int main() {
 	off_t fileSize;
 	errReport(getFileSize(fd, &fileSize),"Unable to get size of test file: ");
 
-	char * map = mmap(NULL,(size_t) fileSize, PROT_WRITE | PROT_READ, MAP_SHARED, fd, 0);
+	char * map = mmap(NULL,(size_t) fileSize + 1, PROT_WRITE | PROT_READ, MAP_SHARED, fd, 0);
 	mapChk(map);
 
 	map[fileSize+1] = 'd';
+
+	errReport(munmap(map,(size_t) fileSize + 1),"Failed to unmap map: ");
 
 	off_t newFileSize;
 	errReport(getFileSize(fd, &newFileSize),"Unable to get size of test file: ");

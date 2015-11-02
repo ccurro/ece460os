@@ -9,7 +9,7 @@ int main() {
 	off_t fileSize;
 	errReport(getFileSize(fd, &fileSize),"Unable to get size of test file: ");
 
-	char * map = mmap(NULL,(size_t) fileSize, PROT_WRITE | PROT_READ, MAP_SHARED, fd, 0);
+	char * map = mmap(NULL,(size_t) fileSize+1, PROT_WRITE | PROT_READ, MAP_SHARED, fd, 0);
 	mapChk(map);
 
 	map[fileSize+1] = 'e';
@@ -31,5 +31,6 @@ int main() {
 		printf("If we create a \"hole\" in a file, any changes previously made in an mmapped region beyond the end of the file will not be visible.\n");
 	}
 
+	errReport(munmap(map,(size_t) fileSize + 1),"Failed to unmap map: ");
 	errReport(close(fd),"Failed to close file: ");
 }

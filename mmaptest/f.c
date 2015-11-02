@@ -26,5 +26,6 @@ int main() {
 	// On the second time around the signal handler does not get called.
 	// Instead the program just core dumps with a bus error.
 
+	errReport(munmap(map,(size_t) 16384),"Failed to unmap map: ");
 	errReport(close(fd),"Failed to close file: ");
 }

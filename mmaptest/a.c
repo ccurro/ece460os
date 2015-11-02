@@ -15,8 +15,10 @@ int main() {
 	off_t fileSize;
 	errReport(getFileSize(fd, &fileSize),"Unable to get size of test file: ");
 
-	char * map = mmap(NULL,(size_t) fileSize, PROT_READ, 0, fd, 0);
-	condChk(map != MAP_FAILED, "Failed to mmap file: ");
+	char * map = mmap(NULL,(size_t) fileSize, PROT_READ, MAP_SHARED, fd, 0);
+	mapChk(map);
+	
+	map[0] = 1; // will SIGSEGV here
 
-	map[0] = 1;
+	errReport(close(fd), "Failed to close file: ");
 }

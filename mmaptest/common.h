@@ -14,4 +14,5 @@
 
 void condChk(int condition, char * str);
 void errReport(int returnVal, char * errStr);
+void mapChk(char * map);
 int getFileSize(int fd, off_t * fileSize);

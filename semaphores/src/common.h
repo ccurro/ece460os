@@ -1,3 +1,6 @@
+#ifndef COMMON_H
+#define COMMON_H
+
 #include <stdio.h>
 #include <unistd.h>
 #include <fcntl.h>
@@ -14,7 +17,10 @@
 
 void condChk(int condition, char * str);
 void errReport(int returnVal, char * errStr);
-void mapChk(int * map);
+void mapChk(void * map);
 void spinLock(volatile int * lck);
+void unLock(volatile int * lock);
 int getFileSize(int fd, off_t * fileSize);
-int tas (volatile int * lock);
+int tas(volatile int * lock);
+
+#endif

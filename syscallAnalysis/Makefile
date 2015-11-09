@@ -1,4 +1,4 @@
-all: hello helloWithBugs helloNoExit
+all: hello helloWithBugs helloNoExit test
 
 hello: hello.s
 	as hello.s -o hello.o
@@ -11,3 +11,6 @@ helloWithBugs: helloWithBugs.s
 helloNoExit: helloNoExit.s
 	as helloNoExit.s -o helloNoExit.o
 	ld helloNoExit.o -o helloNoExit
+
+test: test.c
+	gcc -g -O0 test.c -o test

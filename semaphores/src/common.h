@@ -20,7 +20,6 @@ void errReport(int returnVal, char * errStr);
 void mapChk(void * map);
 void spinLock(volatile int * lck);
 void unLock(volatile int * lock);
-int getFileSize(int fd, off_t * fileSize);
 int tas(volatile int * lock);
 
 #endif

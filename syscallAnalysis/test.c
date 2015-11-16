@@ -23,7 +23,7 @@ int timeval_subtract (struct timespec * result, struct timespec * x, struct time
 	return x->tv_sec < y->tv_sec;
 }
 
-int test(void (*handler)(void)) {
+ double test(void (*handler)(void)) {
 	struct timespec start;
 	struct timespec end;
 	int nTimes = 40000000;
@@ -44,18 +44,17 @@ int test(void (*handler)(void)) {
 
 	struct timespec result;
 	timeval_subtract(&result, &end, &start);
-
-	return (10000000000*result.tv_sec + result.tv_nsec)/nTimes;
+	return (double) (10000000000*result.tv_sec + result.tv_nsec)/nTimes;
 }
 
 int main() {
-	int emptyLoop = test(NULL);
-	printf("%-29s %d (ns)\n","Empty loop iteration: ", emptyLoop);
+	double emptyLoop = test(NULL);
+	printf("%-29s %f (ns)\n","Empty loop iteration: ", emptyLoop);
 	
-	int emptyFunc = test(empty) - emptyLoop;
-	printf("Empty function call in loop:  %d (ns)\n",emptyFunc);
+	double emptyFunc = test(empty) - emptyLoop;
+	printf("Empty function call in loop:  %f (ns)\n",emptyFunc);
 
 	// cast output of getuid() to be void * rather than int
-	int t = test((void *) getuid) - emptyLoop - emptyFunc; 
-	printf("%-28s %d (ns)\n","Syscall (getuid) in loop: ", t);
+	double t = test((void *) getuid) - emptyLoop - emptyFunc; 
+	printf("%-28s %f (ns)\n","Syscall (getuid) in loop: ", t);
 }

@@ -26,13 +26,3 @@ void spinLock(volatile int * lck) {
 void unLock(volatile int * lock) {
 	*lock = 0;
 }
-
-int getFileSize(int fd, off_t * fileSize) {
-	struct stat fileStat;
-	if (fstat(fd,&fileStat) == -1) {
-		return -1;
-	} else {
-		*fileSize = fileStat.st_size;
-		return 0;
-	}
-}

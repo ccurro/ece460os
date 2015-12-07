@@ -1,7 +1,7 @@
 CC = gcc
 CFLAGS = -g
 
-all: test stackTest
+all: test
 
 test: common.o sched.o adjstack.o test.c
 	${CC} ${CFLAGS} -o ../test test.c common.o sched.o adjstack.o savectx64.S

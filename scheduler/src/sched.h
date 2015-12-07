@@ -2,13 +2,13 @@
 #define SCHED_H
 
 #define TICK_RATE 0.001
-#define SCHED_NPROC 256
+#define SCHED_NPROC 512
 /* Suggested task state values */
 #define SCHED_READY 1
 #define SCHED_RUNNING 2
 #define SCHED_SLEEPING 3
-#define SCHED_ZOMBIE 4
-
+#define SCHED_ZOMBIE 666
+#define SCHED_WAITING 333
 typedef struct sched_proc {
 	void * stack_basePtr;
 	void * stack_stackPtr;
@@ -17,12 +17,15 @@ typedef struct sched_proc {
 	pid_t pid;
 	pid_t ppid;
 	int taskAssigned;
+	int nLivingChildren;
 } sched_proc;
 
 typedef struct sched_waitq {
 	struct sched_proc * procs[SCHED_NPROC];
 	pid_t pids[SCHED_NPROC];
 } sched_waitq;
+
+struct sched_proc * current;
 
 void waitq_init();
 void sched_init(void (*init_fn)());
@@ -38,4 +41,5 @@ void sched_ps();
 void sched_switch();
 void sched_tick();
 void adjstack(void *lim0,void *lim1,unsigned long adj);
+void sigsegvHandler(int signo);
 #endif

@@ -1,41 +1,50 @@
 #include "common.h"
 #include "sched.h"
 
-#define STACK_SIZE 64000
+#define STACK_SIZE 65536
 
-struct sched_proc * current;
+// struct sched_proc * current;
 int nTicks = 0;
 sched_waitq waitq;
 struct savectx fork_ctx;
+sigset_t old_mask;
 
 void sched_switch() {
 	fprintf(stderr,"In switching routine\n");
 	for (int i = 0; i < SCHED_NPROC; i++) {
 		if (waitq.procs[i]->state == SCHED_READY) {
+			fprintf(stderr,"pid %d, is in state %d\n",i+1,waitq.procs[i]->state);
+			if (current->state == SCHED_RUNNING) {
+				current->state = SCHED_READY;
+			}
+
 			waitq.procs[i]->state = SCHED_RUNNING;
-			current->state = SCHED_READY;
-			fprintf(stderr,"Switched to pid %d\n", waitq.procs[i]->pid);
+
+			current = waitq.procs[i];
+			fprintf(stderr,"Switched to pid %d\n", waitq.pids[i]);
+			unBlock(old_mask);
 			restorectx(waitq.procs[i]->ctx,1);
 		}
 	}
+	printf("All zombies\n");
+	exit(0);
 }
 
 void sched_tick(int signo) {
-	sigset_t old_mask = block();
-	nTicks++;
+	old_mask = block();
+	nTicks++;	
+	fprintf(stderr,"\t tick # %d\n",nTicks);
 
-	struct savectx ctx;
-	int jmped;
-	errReport(jmped = savectx(&ctx),"Failed to save context: ");
-	if (jmped == 0) {
-		fprintf(stderr,"jmped\n");
-		sched_switch();
+	if (current->state != SCHED_WAITING) {
+		current->state = SCHED_READY;
 	}
 
-	fprintf(stderr,"Returned from switch\n");
+	sched_ps();
 
-	if (nTicks == SCHED_NPROC) {
-		exit(0);
+	int jmpd = savectx(current->ctx);
+
+	if (!jmpd) {
+		sched_switch();
 	}
 
 	unBlock(old_mask);
@@ -55,19 +64,23 @@ void waitq_init() {
 	for (int i = 0; i < SCHED_NPROC; i++) {
 		waitq.procs[i] = malloc(sizeof (struct sched_proc));
 		waitq.procs[i]->taskAssigned = 0;
+		waitq.procs[i]->nLivingChildren = 0;
 		waitq.pids[i] = i+1;
 	}
 }
 
 void sched_init(void (*init_fn)()) {
+	signal(SIGSEGV, sigsegvHandler);	
 	waitq_init();
 	signal(SIGVTALRM, sched_tick);
 
 	struct itimerval periodicIntervalTimer;
 	periodicIntervalTimer.it_interval.tv_sec = 0;
 	periodicIntervalTimer.it_interval.tv_usec = 1000;
+	// periodicIntervalTimer.it_interval.tv_usec = 10000;
 	periodicIntervalTimer.it_value.tv_sec = 0;
 	periodicIntervalTimer.it_value.tv_usec = 1000;
+	// periodicIntervalTimer.it_value.tv_usec = 10000;
 	setitimer(ITIMER_VIRTUAL, &periodicIntervalTimer, NULL);
 
 	void *newsp;
@@ -102,38 +115,87 @@ void sched_init(void (*init_fn)()) {
 pid_t sched_fork() {
 	sigset_t old_mask = block();
 	pid_t cpid = sched_getfreepid();
-	printf("%d\n",cpid);
-	int waitq_index = cpid - 1;
+	printf("Next pid %d\n",cpid);
 
-	void * c_sp;
+	if(savectx(current->ctx)){
+		unBlock(old_mask); 		
+		return cpid;
+	} else {
 
-	if ((c_sp=mmap(0,STACK_SIZE,PROT_READ|PROT_WRITE,
-		MAP_PRIVATE|MAP_ANONYMOUS,0,0))==MAP_FAILED)
-	{
-		perror("mmap failed");
+		int waitq_index = cpid - 1;
+		sched_proc parent = *current;
+
+		void * stack_basePtr;
+
+		if ((stack_basePtr = mmap(0,STACK_SIZE,PROT_READ|PROT_WRITE,
+			MAP_PRIVATE|MAP_ANONYMOUS,0,0))==MAP_FAILED)
+		{
+			perror("mmap failed");
+		}
+
+		for (int i = 0; i < STACK_SIZE; i++) {
+			// fprintf(stderr,"%d ",i);
+			*((char*) (stack_basePtr + i));
+			*((char*) (parent.stack_basePtr + i));			
+		}
+
+		fprintf(stderr,"Made it through loop\n");
+
+		memcpy(stack_basePtr,parent.stack_basePtr,STACK_SIZE);
+		struct savectx ctx;
+
+		int jmped;
+		jmped = savectx(&ctx);
+
+		if (jmped) {
+			fprintf(stderr,"Return to child\n");
+			return 0;
+		}
+
+		fprintf(stderr,"Manipulating stack\n");
+
+		int diff = stack_basePtr - parent.stack_basePtr;
+
+		ctx.regs[JB_SP] += diff;
+		ctx.regs[JB_BP] += diff;
+
+		waitq.procs[waitq_index]->stack_basePtr += diff;
+		waitq.procs[waitq_index]->stack_stackPtr += diff;
+
+		adjstack(stack_basePtr, stack_basePtr + STACK_SIZE, diff);	
+
+		waitq.procs[waitq_index]->ctx = &ctx;
+		waitq.procs[waitq_index]->state = SCHED_READY;
+		waitq.procs[waitq_index]->pid = cpid;
+		waitq.procs[waitq_index]->ppid = parent.pid;
+		waitq.procs[waitq_index]->taskAssigned = 1;
+		waitq.pids[waitq_index] = cpid;
+
+		fprintf(stderr,"forked to make pid %d\n",cpid);
+
+		sched_switch();
 	}
+}
 
-	memcpy(c_sp,current->stack_basePtr,STACK_SIZE);
+void sched_exit(int code) {
+	fprintf(stderr,"Exited\n");
+	waitq.procs[current->ppid-1]->nLivingChildren--;
+	old_mask = block();	
+	current->state = SCHED_ZOMBIE;	
+	sched_switch();
+}
 
-	struct savectx ctx;
-	errReport(savectx(&ctx),"Failed to save context: ");
-
-	ctx.regs[JB_SP] = c_sp + STACK_SIZE;
-	ctx.regs[JB_BP] = c_sp;
-
-	adjstack(c_sp, c_sp+STACK_SIZE, current->stack_basePtr - (c_sp+STACK_SIZE));
-
-	waitq.procs[waitq_index]->stack_basePtr = c_sp;
-	waitq.procs[waitq_index]->stack_stackPtr = c_sp + STACK_SIZE;
-
-	waitq.procs[waitq_index]->ctx = &ctx;
-	waitq.procs[waitq_index]->state = SCHED_READY;
-	waitq.procs[waitq_index]->pid = cpid;
-	waitq.procs[waitq_index]->ppid = current->pid;
-	waitq.procs[waitq_index]->taskAssigned = 1;
-	waitq.pids[waitq_index] = cpid;
-	fprintf(stderr,"forked\n");
-	unBlock(old_mask);
-
-	return cpid;
+void sched_ps() {
+	printf("\npid \t state\n");
+	for (int i = 0; i < SCHED_NPROC; i++) {
+		if (waitq.procs[i]->taskAssigned) {
+			printf("%d \t %d\n",waitq.procs[i]->pid,waitq.procs[i]->state);
+		}
+	}
+	printf("\n");
+}
+void sigsegvHandler(int signo) {
+	sched_ps();
+	fprintf(stderr,"SIGSEGV\n");
+	exit(0);
 }
